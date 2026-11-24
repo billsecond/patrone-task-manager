@@ -8,8 +8,9 @@ listing=$(dbus-run-session -- flatpak run "$id" --list-processes)
 echo "$listing" | head -5
 count=$(wc -l <<< "$listing")
 echo "$count processes"
-# The computer's PID 1 is its init (systemd), where the sandbox's is bwrap
-if ! grep -qP '^1\t\S+\t(systemd|init)$' <<< "$listing"; then
+# The computer's PID 1 is its init (systemd), where the sandbox's is bwrap,
+# and its account is root, by name from the computer's user database
+if ! grep -qP '^1\troot\t(systemd|init)$' <<< "$listing"; then
     echo "Not the computer's processes. The helper, run by hand:" >&2
     dbus-run-session -- flatpak run --command=sh "$id" -c \
         'files=$(sed -n "s/^app-path=//p" /.flatpak-info); echo "app-path: $files"; printf "R\t/proc/1/comm\n" | flatpak-spawn --host "$files/libexec/patrone-task-manager-agent"' >&2 || true
