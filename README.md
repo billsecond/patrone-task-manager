@@ -315,8 +315,10 @@ sandbox's processes, and `kill` and `setpriority` can't reach the
 computer's. `src/host.rs` is the one way Task Manager reads `/proc` and
 `/sys` and signals or reprioritizes a process: as a package, that's
 `std::fs` and libc as before. In the Flatpak, it starts its helper
-(`agent/`, a crate of its own with no dependencies, linked statically and
-installed as `/app/libexec/patrone-task-manager-agent`) on the computer
+(`agent/`, a crate of its own with no dependencies, installed as
+`/app/libexec/patrone-task-manager-agent`; it needs only glibc and libgcc_s
+on the computer, and the Flatpak's build says the newest glibc version it
+calls for) on the computer
 with `flatpak-spawn --host`, by the path the computer knows the app's files
 by (`/.flatpak-info`'s `app-path`), and asks it over a pipe; the protocol
 is at the top of `agent/src/main.rs`. journalctl, dpkg-query and pkexec run

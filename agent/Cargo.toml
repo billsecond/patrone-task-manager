@@ -1,7 +1,7 @@
 # Task Manager's helper for its Flatpak (src/host.rs): the computer's /proc,
 # /sys, kill and setpriority, for an app in a sandbox that can't see them.
-# A crate of its own with no dependencies, linked statically, so it runs on
-# whatever C library the computer has.
+# A crate of its own with no dependencies, so it needs nothing of the
+# computer's but glibc (and libgcc_s, as every Rust program does).
 [package]
 name = "patrone-task-manager-agent"
 version = "0.1.0"
