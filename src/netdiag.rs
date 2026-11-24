@@ -6,7 +6,6 @@
 //! browsers for some sites) has no such counters and isn't counted.
 
 use std::collections::HashMap;
-use std::fs;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::time::{Duration, Instant};
 
@@ -82,11 +81,11 @@ impl Tracker {
 fn socket_owners(pids: &[i32]) -> HashMap<u64, i32> {
     let mut owners = HashMap::new();
     for &pid in pids {
-        let Ok(entries) = fs::read_dir(format!("/proc/{pid}/fd")) else {
+        let Ok(entries) = crate::host::read_dir(format!("/proc/{pid}/fd")) else {
             continue;
         };
         for entry in entries.flatten() {
-            let Ok(target) = fs::read_link(entry.path()) else {
+            let Ok(target) = crate::host::read_link(entry.path()) else {
                 continue;
             };
             let target = target.to_string_lossy();

@@ -3,10 +3,11 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::CStr;
-use std::fs;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::Path;
 use std::time::Instant;
+
+use crate::host;
 
 /// What doesn't change while the computer runs: the processor's make-up.
 pub struct CpuInfo {
@@ -23,7 +24,7 @@ pub struct CpuInfo {
 
 impl CpuInfo {
     pub fn read() -> Self {
-        let text = fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
+        let text = host::read_to_string("/proc/cpuinfo").unwrap_or_default();
         let mut model = String::new();
         let mut logical = 0;
         let mut sockets = BTreeSet::new();
@@ -82,7 +83,7 @@ impl CpuInfo {
 fn caches() -> [Option<u64>; 3] {
     let mut seen = BTreeSet::new();
     let mut sizes = [None; 3];
-    let Ok(cpus) = fs::read_dir("/sys/devices/system/cpu") else {
+    let Ok(cpus) = host::read_dir("/sys/devices/system/cpu") else {
         return sizes;
     };
     for cpu in cpus.flatten() {
@@ -93,7 +94,7 @@ fn caches() -> [Option<u64>; 3] {
         {
             continue;
         }
-        let Ok(indexes) = fs::read_dir(cpu.path().join("cache")) else {
+        let Ok(indexes) = host::read_dir(cpu.path().join("cache")) else {
             continue;
         };
         for index in indexes.flatten() {
@@ -242,7 +243,7 @@ impl Sampler {
             disks: self.disks(elapsed),
             nets: self.nets(elapsed),
             gpus: gpus(),
-            uptime: fs::read_to_string("/proc/uptime")
+            uptime: host::read_to_string("/proc/uptime")
                 .ok()
                 .and_then(|text| {
                     text.split_whitespace()
@@ -250,7 +251,7 @@ impl Sampler {
                         .and_then(|value| value.parse().ok())
                 })
                 .unwrap_or(0.0),
-            open_files: fs::read_to_string("/proc/sys/fs/file-nr")
+            open_files: host::read_to_string("/proc/sys/fs/file-nr")
                 .ok()
                 .and_then(|text| {
                     text.split_whitespace()
@@ -263,7 +264,7 @@ impl Sampler {
 
     /// /proc/stat's "cpu" lines: busy and total time since boot.
     fn cpu(&mut self) -> (f64, Vec<f64>) {
-        let text = fs::read_to_string("/proc/stat").unwrap_or_default();
+        let text = host::read_to_string("/proc/stat").unwrap_or_default();
         let mut now = Vec::new();
         for line in text.lines().take_while(|line| line.starts_with("cpu")) {
             let values: Vec<u64> = line
@@ -296,7 +297,7 @@ impl Sampler {
     }
 
     fn disks(&mut self, elapsed: f64) -> Vec<Disk> {
-        let text = fs::read_to_string("/proc/diskstats").unwrap_or_default();
+        let text = host::read_to_string("/proc/diskstats").unwrap_or_default();
         let mut disks = Vec::new();
         for line in text.lines() {
             let fields: Vec<&str> = line.split_ascii_whitespace().collect();
@@ -374,7 +375,7 @@ impl Sampler {
     }
 
     fn nets(&mut self, elapsed: f64) -> Vec<Net> {
-        let text = fs::read_to_string("/proc/net/dev").unwrap_or_default();
+        let text = host::read_to_string("/proc/net/dev").unwrap_or_default();
         let mut nets = Vec::new();
         for line in text.lines().skip(2) {
             let Some((name, values)) = line.split_once(':') else {
@@ -440,26 +441,26 @@ fn shown_disk(name: &str) -> bool {
 
 /// The disk holding "/", through any volume or encryption layers.
 fn system_disk() -> Option<String> {
-    let mountinfo = fs::read_to_string("/proc/self/mountinfo").ok()?;
+    let mountinfo = host::read_to_string("/proc/self/mountinfo").ok()?;
     let device = mountinfo.lines().find_map(|line| {
         let fields: Vec<&str> = line.split(' ').collect();
         (fields.get(4) == Some(&"/"))
             .then(|| fields.get(2).map(|d| d.to_string()))
             .flatten()
     })?;
-    let mut path = fs::canonicalize(format!("/sys/dev/block/{device}")).ok()?;
+    let mut path = host::canonicalize(format!("/sys/dev/block/{device}")).ok()?;
     for _ in 0..8 {
         // A volume (dm-0, md0): follow it to what it's built on
-        if let Some(slave) = fs::read_dir(path.join("slaves"))
+        if let Some(slave) = host::read_dir(path.join("slaves"))
             .ok()
             .and_then(|mut slaves| slaves.next())
             .and_then(|s| s.ok())
         {
-            path = fs::canonicalize(slave.path()).ok()?;
+            path = host::canonicalize(slave.path()).ok()?;
             continue;
         }
         // A partition: its disk is the folder above
-        if path.join("partition").exists() {
+        if host::exists(path.join("partition")) {
             path = path.parent()?.to_path_buf();
         }
         return path
@@ -473,7 +474,7 @@ fn system_disk() -> Option<String> {
 fn current_mhz() -> Option<f64> {
     let mut sum = 0.0;
     let mut count = 0;
-    if let Ok(cpus) = fs::read_dir("/sys/devices/system/cpu") {
+    if let Ok(cpus) = host::read_dir("/sys/devices/system/cpu") {
         for cpu in cpus.flatten() {
             if let Some(khz) = read_u64(&cpu.path().join("cpufreq/scaling_cur_freq")) {
                 sum += khz as f64 / 1000.0;
@@ -485,7 +486,7 @@ fn current_mhz() -> Option<f64> {
         return Some(sum / count as f64);
     }
     // No cpufreq (a virtual machine): what /proc/cpuinfo says
-    let text = fs::read_to_string("/proc/cpuinfo").ok()?;
+    let text = host::read_to_string("/proc/cpuinfo").ok()?;
     for line in text.lines() {
         if let Some(value) = line
             .strip_prefix("cpu MHz")
@@ -500,7 +501,7 @@ fn current_mhz() -> Option<f64> {
 }
 
 fn memory() -> Memory {
-    let text = fs::read_to_string("/proc/meminfo").unwrap_or_default();
+    let text = host::read_to_string("/proc/meminfo").unwrap_or_default();
     let mut values = HashMap::new();
     for line in text.lines() {
         if let Some((key, value)) = line.split_once(':') {
@@ -532,7 +533,7 @@ fn memory() -> Memory {
 /// Graphics cards that say how busy they are (amdgpu's gpu_busy_percent).
 fn gpus() -> Vec<Gpu> {
     let mut gpus = Vec::new();
-    let Ok(cards) = fs::read_dir("/sys/class/drm") else {
+    let Ok(cards) = host::read_dir("/sys/class/drm") else {
         return gpus;
     };
     let mut cards: Vec<_> = cards
@@ -549,7 +550,7 @@ fn gpus() -> Vec<Gpu> {
         let Some(busy) = read_u64(&device.join("gpu_busy_percent")) else {
             continue;
         };
-        let driver = fs::read_link(device.join("driver"))
+        let driver = host::read_link(device.join("driver"))
             .ok()
             .and_then(|link| {
                 link.file_name()
@@ -611,7 +612,7 @@ fn addresses() -> HashMap<String, (Vec<String>, Vec<String>)> {
 
 /// When the computer started, in seconds since 1970 (/proc/stat's btime).
 pub fn boot_time() -> Option<i64> {
-    fs::read_to_string("/proc/stat")
+    host::read_to_string("/proc/stat")
         .ok()?
         .lines()
         .find_map(|line| {
@@ -621,7 +622,7 @@ pub fn boot_time() -> Option<i64> {
 }
 
 pub fn read_text(path: &Path) -> Option<String> {
-    fs::read_to_string(path)
+    host::read_to_string(path)
         .ok()
         .map(|text| text.trim().to_string())
 }

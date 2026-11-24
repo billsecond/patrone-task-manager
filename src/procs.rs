@@ -3,11 +3,12 @@
 
 use std::collections::HashMap;
 use std::ffi::CStr;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Read;
 use std::rc::Rc;
 use std::time::Instant;
 
+use crate::host;
 use crate::netdiag;
 
 /// A kernel thread (`PF_KTHREAD` in /proc/PID/stat's flags).
@@ -117,7 +118,7 @@ impl Scanner {
         let recheck = self.updates.is_multiple_of(RECHECK_EVERY);
 
         let mut processes = Vec::with_capacity(self.known.len().max(256));
-        let Ok(entries) = fs::read_dir("/proc") else {
+        let Ok(entries) = host::read_dir("/proc") else {
             return processes;
         };
         let mut seen = Vec::with_capacity(self.known.len().max(256));
@@ -164,7 +165,7 @@ impl Scanner {
         if fresh {
             // The real UID from status: /proc/PID itself belongs to root
             // when the process has made itself non-dumpable
-            let uid = fs::read_to_string(format!("/proc/{pid}/status"))
+            let uid = host::read_to_string(format!("/proc/{pid}/status"))
                 .ok()
                 .and_then(|status| {
                     status.lines().find_map(|line| {
@@ -330,7 +331,7 @@ fn display_name(comm: &str, cmdline: &str, kernel: bool) -> String {
 }
 
 fn read_cmdline(pid: i32) -> String {
-    let Ok(bytes) = fs::read(format!("/proc/{pid}/cmdline")) else {
+    let Ok(bytes) = host::read(format!("/proc/{pid}/cmdline")) else {
         return String::new();
     };
     let text = String::from_utf8_lossy(&bytes);
@@ -339,7 +340,7 @@ fn read_cmdline(pid: i32) -> String {
 
 /// The control group, from cgroup v2's "0::/path" line.
 fn read_cgroup(pid: i32) -> String {
-    fs::read_to_string(format!("/proc/{pid}/cgroup"))
+    host::read_to_string(format!("/proc/{pid}/cgroup"))
         .ok()
         .and_then(|text| {
             text.lines()
@@ -350,6 +351,11 @@ fn read_cgroup(pid: i32) -> String {
 
 fn read_into(path: &str, buffer: &mut String) -> bool {
     buffer.clear();
+    if host::sandboxed() {
+        return host::read_to_string(path)
+            .map(|text| buffer.push_str(&text))
+            .is_ok();
+    }
     match File::open(path) {
         Ok(mut file) => file.read_to_string(buffer).is_ok(),
         Err(_) => false,
@@ -359,6 +365,15 @@ fn read_into(path: &str, buffer: &mut String) -> bool {
 /// An account's login name and full name, from the system's user database
 /// (getpwuid_r, so network and systemd-homed accounts are found too).
 pub fn account(uid: u32) -> (String, String) {
+    if host::sandboxed() {
+        return match host::account(uid) {
+            Some((login, gecos)) => (
+                login,
+                gecos.split(',').next().unwrap_or("").trim().to_string(),
+            ),
+            None => (uid.to_string(), String::new()),
+        };
+    }
     // SAFETY: an all-zero passwd is a valid out-parameter.
     let mut entry: libc::passwd = unsafe { std::mem::zeroed() };
     let mut result: *mut libc::passwd = std::ptr::null_mut();

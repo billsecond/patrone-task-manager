@@ -20,7 +20,22 @@ pub struct Entry {
 /// account's and the system's applications folders.
 pub fn find(id: &str) -> Option<Entry> {
     let file_name = format!("{id}.desktop");
-    let folders = std::iter::once(glib::user_data_dir()).chain(glib::system_data_dirs());
+    let folders: Vec<std::path::PathBuf> = if crate::host::sandboxed() {
+        // The computer's apps, not the sandbox's: the account's, Flatpak's
+        // (the account's and everyone's) and the system's
+        let home = glib::home_dir();
+        vec![
+            home.join(".local/share"),
+            home.join(".local/share/flatpak/exports/share"),
+            "/var/lib/flatpak/exports/share".into(),
+            "/usr/local/share".into(),
+            "/usr/share".into(),
+        ]
+    } else {
+        std::iter::once(glib::user_data_dir())
+            .chain(glib::system_data_dirs())
+            .collect()
+    };
     for folder in folders {
         let path = folder.join("applications").join(&file_name);
         if let Some(file) = load(&path) {
@@ -46,7 +61,7 @@ pub fn find(id: &str) -> Option<Entry> {
 pub fn load(path: &Path) -> Option<glib::KeyFile> {
     let file = glib::KeyFile::new();
     file.load_from_file(
-        path,
+        crate::host::os_path(path),
         glib::KeyFileFlags::KEEP_COMMENTS | glib::KeyFileFlags::KEEP_TRANSLATIONS,
     )
     .ok()?;

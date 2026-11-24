@@ -1,0 +1,62 @@
+# Patrone Task Manager's Flatpak. tools/build-flatpak.sh builds it: it puts
+# the source (with its crates vendored, so the build runs offline) in src/
+# beside a copy of this file.
+#
+# A sandbox sees only its own processes, so the app asks its helper (agent/)
+# for the computer's /proc and /sys, and to signal or reprioritize its
+# processes: the helper runs on the computer through flatpak-spawn --host
+# (src/host.rs). It uses only the C library's oldest calls, so the glibc
+# it needs is old: the build says which (GLIBC_ below).
+id: org.patrone.TaskManager
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: patrone-task-manager
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # The helper, and journalctl, dpkg-query and pkexec, on the computer
+  - --talk-name=org.freedesktop.Flatpak
+  # Users (sign out, disconnect) and services (start, stop, restart)
+  - --system-talk-name=org.freedesktop.login1
+  - --system-talk-name=org.freedesktop.systemd1
+  - --talk-name=org.freedesktop.systemd1
+  - --talk-name=org.gnome.SessionManager
+  # Open file location
+  - --talk-name=org.freedesktop.FileManager1
+  # Apps' names and icons, unit files and everyone's startup apps
+  - --filesystem=host-os:ro
+  - --filesystem=host-etc:ro
+  - --filesystem=xdg-data/applications:ro
+  - --filesystem=~/.local/share/flatpak/exports:ro
+  - --filesystem=/var/lib/flatpak/exports:ro
+  # Turning startup apps on and off, for the account
+  - --filesystem=xdg-config/autostart:create
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: patrone-task-manager
+    buildsystem: simple
+    build-options:
+      env:
+        CARGO_HOME: /run/build/patrone-task-manager/cargo
+    build-commands:
+      - cargo build --release --frozen
+      - install -Dm755 target/release/patrone-task-manager /app/bin/patrone-task-manager
+      # The helper, which runs on the computer, outside the runtime: the
+      # newest glibc it needs is the oldest a computer can have
+      - cargo build --release --frozen --manifest-path agent/Cargo.toml
+      - install -Dm755 agent/target/release/patrone-task-manager-agent /app/libexec/patrone-task-manager-agent
+      - objdump -T agent/target/release/patrone-task-manager-agent | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -n 1
+      - install -Dm644 -t /app/share/applications data/org.patrone.TaskManager.desktop
+      - install -Dm644 -t /app/share/icons/hicolor/scalable/apps data/org.patrone.TaskManager.svg
+      - install -Dm644 -t /app/share/metainfo data/org.patrone.TaskManager.metainfo.xml
+      - gzip -9n < third-party-licenses.txt > third-party-licenses.txt.gz
+      - install -Dm644 -t /app/share/doc/patrone-task-manager LICENSE third-party-licenses.txt.gz
+    sources:
+      - type: dir
+        path: src
