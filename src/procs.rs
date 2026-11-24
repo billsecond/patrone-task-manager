@@ -365,6 +365,15 @@ fn read_into(path: &str, buffer: &mut String) -> bool {
 /// An account's login name and full name, from the system's user database
 /// (getpwuid_r, so network and systemd-homed accounts are found too).
 pub fn account(uid: u32) -> (String, String) {
+    if host::sandboxed() {
+        return match host::account(uid) {
+            Some((login, gecos)) => (
+                login,
+                gecos.split(',').next().unwrap_or("").trim().to_string(),
+            ),
+            None => (uid.to_string(), String::new()),
+        };
+    }
     // SAFETY: an all-zero passwd is a valid out-parameter.
     let mut entry: libc::passwd = unsafe { std::mem::zeroed() };
     let mut result: *mut libc::passwd = std::ptr::null_mut();

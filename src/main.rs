@@ -137,7 +137,10 @@ fn main() -> glib::ExitCode {
     }
     // What the Processes and Details pages read, without a window: in the
     // Flatpak, the computer's processes through its helper (host.rs)
-    if arguments.iter().any(|argument| argument == "--list-processes") {
+    if arguments
+        .iter()
+        .any(|argument| argument == "--list-processes")
+    {
         let cpus = std::thread::available_parallelism().map_or(1, usize::from);
         for process in procs::Scanner::new().scan(cpus) {
             println!("{}\t{}\t{}", process.pid, process.user, process.name);

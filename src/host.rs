@@ -153,6 +153,19 @@ pub fn exists(path: impl AsRef<Path>) -> bool {
     }
 }
 
+/// An account's login name and GECOS field, from the computer's user
+/// database (the sandbox's has few accounts); None outside the Flatpak,
+/// where the caller looks it up itself.
+pub fn account(uid: u32) -> Option<(String, String)> {
+    if !sandboxed() {
+        return None;
+    }
+    let answer = ask(b'U', uid.to_string().as_bytes()).ok()?;
+    let text = String::from_utf8_lossy(&answer);
+    let (login, gecos) = text.split_once('\t')?;
+    Some((login.to_owned(), gecos.to_owned()))
+}
+
 /// kill(2): Ok, or the error.
 pub fn kill(pid: i32, signal: i32) -> io::Result<()> {
     if sandboxed() {
