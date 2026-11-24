@@ -86,19 +86,19 @@ fn end(context: &Rc<Context>, targets: Vec<(i32, u64)>) {
         if !procs::still_running(pid, start) {
             continue;
         }
-        // SAFETY: kill(2) on a PID just checked to be this process.
-        if unsafe { libc::kill(pid, libc::SIGTERM) } == 0 {
-            asked.push((pid, start));
-        } else if std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM) {
-            denied.push(pid);
+        // kill(2) on a PID just checked to be this process
+        match crate::host::kill(pid, libc::SIGTERM) {
+            Ok(()) => asked.push((pid, start)),
+            Err(error) if error.raw_os_error() == Some(libc::EPERM) => denied.push(pid),
+            Err(_) => {}
         }
     }
     if !asked.is_empty() {
         glib::timeout_add_seconds_local_once(GRACE_SECONDS, move || {
             for (pid, start) in asked {
                 if procs::still_running(pid, start) {
-                    // SAFETY: as above, checked again just now.
-                    unsafe { libc::kill(pid, libc::SIGKILL) };
+                    // As above, checked again just now
+                    let _ = crate::host::kill(pid, libc::SIGKILL);
                 }
             }
         });
@@ -117,6 +117,7 @@ fn end(context: &Rc<Context>, targets: Vec<(i32, u64)>) {
 /// Runs a command through pkexec, which asks for an administrator's
 /// password, and says so if it fails (not if the person cancels).
 pub fn run_as_administrator(context: &Rc<Context>, command: Vec<String>, failure: &'static str) {
+    let command = crate::host::argv(command);
     let arguments: Vec<&std::ffi::OsStr> = command.iter().map(std::ffi::OsStr::new).collect();
     let process = match gio::Subprocess::newv(&arguments, gio::SubprocessFlags::STDERR_PIPE) {
         Ok(process) => process,
@@ -160,8 +161,8 @@ pub fn set_priority(context: &Rc<Context>, row: &Row, nice: i32) {
         if !procs::still_running(pid, start) {
             continue;
         }
-        // SAFETY: setpriority(2) on a process just checked.
-        if unsafe { libc::setpriority(libc::PRIO_PROCESS, pid as libc::id_t, nice) } != 0 {
+        // setpriority(2) on a process just checked
+        if crate::host::set_nice(pid, nice).is_err() {
             denied.push(pid);
         }
     }
@@ -189,7 +190,7 @@ pub const PRIORITIES: [(&str, &str, i32); 5] = [
 
 /// The program file a process runs.
 fn program_path(pid: i32, command: &str) -> Option<PathBuf> {
-    if let Ok(path) = fs::read_link(format!("/proc/{pid}/exe")) {
+    if let Ok(path) = crate::host::read_link(format!("/proc/{pid}/exe")) {
         let text = path.to_string_lossy();
         let text = text.strip_suffix(" (deleted)").unwrap_or(&text);
         return Some(PathBuf::from(text));
@@ -281,10 +282,10 @@ pub fn properties(context: &Rc<Context>, row: &Row) {
         .and_then(|when| when.format("%x %X").ok())
         .map(|text| text.to_string())
         .unwrap_or_default();
-    let program = fs::read_link(format!("/proc/{}/exe", process.pid))
+    let program = crate::host::read_link(format!("/proc/{}/exe", process.pid))
         .map(|path| path.display().to_string())
         .unwrap_or_else(|_| "Not readable".into());
-    let folder = fs::read_link(format!("/proc/{}/cwd", process.pid))
+    let folder = crate::host::read_link(format!("/proc/{}/cwd", process.pid))
         .map(|path| path.display().to_string())
         .unwrap_or_else(|_| "Not readable".into());
     lines.extend([

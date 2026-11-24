@@ -346,7 +346,7 @@ impl Page {
         if let Some(text) = self.descriptions.borrow().get(path) {
             return text.clone();
         }
-        let text = std::fs::read_to_string(path)
+        let text = std::fs::read_to_string(crate::host::os_path(std::path::Path::new(path)))
             .ok()
             .and_then(|text| {
                 text.lines().find_map(|line| {

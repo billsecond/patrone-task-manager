@@ -22,6 +22,8 @@ override_dh_auto_install:
 	    $(pkg)/usr/share/applications/org.patrone.TaskManager.desktop
 	install -Dm644 data/org.patrone.TaskManager.svg \
 	    $(pkg)/usr/share/icons/hicolor/scalable/apps/org.patrone.TaskManager.svg
+	install -Dm644 data/org.patrone.TaskManager.metainfo.xml \
+	    $(pkg)/usr/share/metainfo/org.patrone.TaskManager.metainfo.xml
 
 override_dh_auto_clean:
 	rm -rf target debian/cargo-home

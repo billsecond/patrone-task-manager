@@ -31,6 +31,19 @@ it first (`TASK_MANAGERS` in the taskbar's `taskbar.js`).
   Installed on its own it leaves Ubuntu's Resources app installed, and
   Ctrl+Shift+Esc is a shortcut to add in Settings (below): both are
   PatroneOS's `patrone-desktop`.
+- **Any Linux, as a Flatpak**, kept up to date: from Patrone's app index
+  (with Flathub, for the GNOME runtime it runs on):
+
+  ```
+  flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  flatpak remote-add --if-not-exists patrone-app-index https://billsecond.github.io/patrone-app-index/patrone-app-index.flatpakrepo
+  flatpak install patrone-app-index org.patrone.TaskManager
+  ```
+
+  A sandbox sees only its own processes, so the Flatpak reads the
+  computer's through a small helper that runs on it (below). It has no
+  Ctrl+Shift+Esc of its own; add one in Settings, with
+  `flatpak run org.patrone.TaskManager` as the command.
 
 Its history up to here is from PatroneOS's repository,
 [billsecond/patroneos](https://github.com/billsecond/patroneos), where it
@@ -290,11 +303,35 @@ own folder (`/tmp/patrone-tm-test`) and display (`wayland-patrone-tm`):
   processes takes 12 to 24 ms a second; GTK's three renderers (Vulkan,
   GL, cairo) were within a few milliseconds of each other.
 
+## Flatpak
+
+`tools/build-flatpak.sh` builds `flatpak/org.patrone.TaskManager.yml` on
+the GNOME 50 runtime, with the crates vendored, into `out/`: the bundle
+and a tarball of the same app's files, which Patrone's app index has
+Flatpak download.
+
+A sandbox has its own process namespace, so `/proc` there shows only the
+sandbox's processes, and `kill` and `setpriority` can't reach the
+computer's. `src/host.rs` is the one way Task Manager reads `/proc` and
+`/sys` and signals or reprioritizes a process: as a package, that's
+`std::fs` and libc as before. In the Flatpak, it starts its helper
+(`agent/`, a crate of its own with no dependencies, linked statically and
+installed as `/app/libexec/patrone-task-manager-agent`) on the computer
+with `flatpak-spawn --host`, by the path the computer knows the app's files
+by (`/.flatpak-info`'s `app-path`), and asks it over a pipe; the protocol
+is at the top of `agent/src/main.rs`. journalctl, dpkg-query and pkexec run
+on the computer the same way (`host::argv`). The computer's unit files,
+everyone's startup apps and apps' names and icons are read where the
+sandbox has them (`/run/host`, from host-os and host-etc; `host::os_path`),
+and Flatpak's exports. `patrone-task-manager --list-processes` prints every
+process it sees, which `.github/workflows/flatpak.yml` checks through the
+installed Flatpak (`tools/test-flatpak.sh`).
+
 ## Releases
 
 A tag `vVERSION`, where VERSION is `debian/changelog`'s, makes a GitHub
 release (`.github/workflows/release.yml`): the `.deb`, built in a clean
-Ubuntu 26.04 container, the source tarball (`git archive` of the tag) and
-`SHA256SUMS`. PatroneOS builds its own package from that tarball: its
+Ubuntu 26.04 container, the source tarball (`git archive` of the tag), the
+Flatpak bundle and its tarball, and `SHA256SUMS`. PatroneOS builds its own package from that tarball: its
 repository pins the release in `packaging/patrone-task-manager/release.txt`, and moving
 the pin on its `main` publishes it to Patrone's apt repository.

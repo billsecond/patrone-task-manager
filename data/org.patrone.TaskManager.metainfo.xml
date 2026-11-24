@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Patrone Task Manager's listing: GNOME Software (and Patrone Software)
+     show it, and Patrone's app index reads it from the Flatpak. -->
+<component type="desktop-application">
+  <id>org.patrone.TaskManager</id>
+  <name>Patrone Task Manager</name>
+  <summary>See what's running and how hard the computer is working</summary>
+  <developer id="com.patroneos">
+    <name>William Daugherty</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      Patrone Task Manager shows the apps and processes running and what
+      each uses, and works the way people who have used Windows expect.
+    </p>
+    <ul>
+      <li>Processes, with processor, memory, disk and network use, and End task</li>
+      <li>Performance graphs for the processors, memory, disks, network and graphics</li>
+      <li>Each app's processor time since the computer started</li>
+      <li>Startup applications, with a switch to turn each off</li>
+      <li>Who is signed in, every process in detail, and the system's services</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">org.patrone.TaskManager.desktop</launchable>
+  <url type="homepage">https://github.com/billsecond/patrone-task-manager</url>
+  <url type="bugtracker">https://github.com/billsecond/patrone-task-manager/issues</url>
+  <url type="vcs-browser">https://github.com/billsecond/patrone-task-manager</url>
+  <provides>
+    <binary>patrone-task-manager</binary>
+  </provides>
+  <categories>
+    <category>System</category>
+    <category>Monitor</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.2.7" date="2026-11-24">
+      <description>
+        <p>Patrone Task Manager as a Flatpak, for any Linux, seeing the computer's processes through a small helper.</p>
+      </description>
+    </release>
+    <release version="0.2.6" date="2026-11-24">
+      <description>
+        <p>Built from its own repository.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -211,6 +211,7 @@ impl Page {
         }
         let mut command = vec!["dpkg-query".to_string(), "-S".to_string()];
         command.extend(paths);
+        let command = crate::host::argv(command);
         let arguments: Vec<&std::ffi::OsStr> = command.iter().map(std::ffi::OsStr::new).collect();
         let Ok(process) = gio::Subprocess::newv(
             &arguments,
@@ -299,11 +300,11 @@ struct Entry {
 }
 
 fn user_folder() -> PathBuf {
-    glib::user_config_dir().join("autostart")
+    crate::host::home_folder(glib::user_config_dir(), ".config").join("autostart")
 }
 
 fn desktop_files(folder: &Path) -> Vec<String> {
-    let Ok(entries) = fs::read_dir(folder) else {
+    let Ok(entries) = fs::read_dir(crate::host::os_path(folder)) else {
         return Vec::new();
     };
     entries
@@ -326,7 +327,7 @@ fn entries() -> Vec<Entry> {
     let mut list = Vec::new();
     for id in ids {
         let system = Path::new(SYSTEM_FOLDER).join(&id);
-        let system = system.exists().then_some(system);
+        let system = crate::host::os_path(&system).exists().then_some(system);
         let mine = user.join(&id);
         let mine = mine.exists().then_some(mine);
         let Some(effective) = mine.as_ref().or(system.as_ref()) else {

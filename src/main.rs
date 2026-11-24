@@ -5,6 +5,7 @@
 //! Ctrl+Shift+Esc opens it on PatroneOS (its patrone-desktop sets that up).
 //!
 //!   patrone-task-manager [--page processes|performance|history|startup|users|details|services]
+//!   patrone-task-manager --list-processes    every process it sees, by PID, and quit
 
 mod actions;
 mod desktop;
@@ -12,6 +13,7 @@ mod details;
 mod format;
 mod graph;
 mod history;
+mod host;
 mod live_style;
 mod model;
 mod netdiag;
@@ -101,6 +103,27 @@ thread_local! {
     static WINDOW: RefCell<Option<Rc<Window>>> = const { RefCell::new(None) };
 }
 
+/// In the Flatpak, the computer's apps' icons, which the sandbox's icon
+/// theme doesn't have: the system's (host-os) and Flatpak's exports.
+fn host_icons() {
+    if !host::sandboxed() {
+        return;
+    }
+    let Some(display) = gdk::Display::default() else {
+        return;
+    };
+    let theme = gtk::IconTheme::for_display(&display);
+    let home = glib::home_dir();
+    for folder in [
+        "/run/host/usr/share/icons".into(),
+        "/run/host/usr/share/pixmaps".into(),
+        home.join(".local/share/flatpak/exports/share/icons"),
+        "/var/lib/flatpak/exports/share/icons".into(),
+    ] {
+        theme.add_search_path(folder);
+    }
+}
+
 fn main() -> glib::ExitCode {
     let arguments: Vec<String> = std::env::args().collect();
     if arguments
@@ -108,8 +131,17 @@ fn main() -> glib::ExitCode {
         .any(|argument| argument == "--help" || argument == "-h")
     {
         println!(
-            "Usage: patrone-task-manager [--page processes|performance|history|startup|users|details|services]"
+            "Usage: patrone-task-manager [--page processes|performance|history|startup|users|details|services]\n       patrone-task-manager --list-processes"
         );
+        return glib::ExitCode::SUCCESS;
+    }
+    // What the Processes and Details pages read, without a window: in the
+    // Flatpak, the computer's processes through its helper (host.rs)
+    if arguments.iter().any(|argument| argument == "--list-processes") {
+        let cpus = std::thread::available_parallelism().map_or(1, usize::from);
+        for process in procs::Scanner::new().scan(cpus) {
+            println!("{}\t{}\t{}", process.pid, process.user, process.name);
+        }
         return glib::ExitCode::SUCCESS;
     }
     let app = gtk::Application::builder()
@@ -118,6 +150,7 @@ fn main() -> glib::ExitCode {
         .build();
     app.connect_startup(|app| {
         load_style();
+        host_icons();
         app.set_accels_for_action("win.run-task", &["<Control>n"]);
         app.set_accels_for_action("win.search", &["<Control>f"]);
     });

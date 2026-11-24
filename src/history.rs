@@ -140,6 +140,7 @@ impl Page {
             "--no-pager",
             RESOURCES_MESSAGE,
         ];
+        let arguments = crate::host::argv(arguments.iter().map(|word| word.to_string()).collect());
         let arguments: Vec<&std::ffi::OsStr> = arguments.iter().map(std::ffi::OsStr::new).collect();
         let Ok(process) = gio::Subprocess::newv(
             &arguments,
@@ -204,8 +205,9 @@ impl Page {
             let entry = usage.entry(group.app_id()).or_default();
             entry.opened += 1;
             // The scope's own count includes its processes that have ended
-            let stat = std::fs::read_to_string(format!("/sys/fs/cgroup{}/cpu.stat", group.key()))
-                .unwrap_or_default();
+            let stat =
+                crate::host::read_to_string(format!("/sys/fs/cgroup{}/cpu.stat", group.key()))
+                    .unwrap_or_default();
             let used = stat
                 .lines()
                 .find_map(|line| {
@@ -216,7 +218,7 @@ impl Page {
                 / 1e6;
             entry.cpu += used;
             let peak =
-                std::fs::read_to_string(format!("/sys/fs/cgroup{}/memory.peak", group.key()))
+                crate::host::read_to_string(format!("/sys/fs/cgroup{}/memory.peak", group.key()))
                     .ok()
                     .and_then(|text| text.trim().parse::<f64>().ok())
                     .unwrap_or(group.memory());
