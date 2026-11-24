@@ -1,3 +1,12 @@
+patrone-task-manager (0.2.6) resolute; urgency=medium
+
+  * Built from its own repository, billsecond/patrone-task-manager,
+    where its releases are made; the package's Homepage and Vcs fields
+    point there. Nothing else changes.
+  * Cargo.toml has the package's version, where it said 0.2.3.
+
+ -- William Daugherty <31995458+billsecond@users.noreply.github.com>  Tue, 24 Nov 2026 09:00:00 -0600
+
 patrone-task-manager (0.2.5) resolute; urgency=medium
 
   * Changes no system settings, so it can be installed on its own on

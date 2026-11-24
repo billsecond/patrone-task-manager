@@ -18,6 +18,26 @@ page asked for. The launcher's actions open Performance, Startup
 applications and Services. The taskbar's right-click "Task Manager" opens
 it first (`TASK_MANAGERS` in the taskbar's `taskbar.js`).
 
+## Installing
+
+- **PatroneOS** has it already.
+- **Ubuntu 26.04 and systems built on it:** from Patrone's apt
+  repository, which keeps it up to date
+  ([billsecond/patrone-apt](https://github.com/billsecond/patrone-apt),
+  "Patrone's apps on Ubuntu"), then `sudo apt install patrone-task-manager`. Or
+  download the `.deb` from the
+  [latest release](https://github.com/billsecond/patrone-task-manager/releases/latest)
+  and open it.
+  Installed on its own it leaves Ubuntu's Resources app installed, and
+  Ctrl+Shift+Esc is a shortcut to add in Settings (below): both are
+  PatroneOS's `patrone-desktop`.
+
+Its history up to here is from PatroneOS's repository,
+[billsecond/patroneos](https://github.com/billsecond/patroneos), where it
+lived in its own folder; pull request numbers in those commits are that
+repository's, and so are paths below such as `docs/`, `desktop/`,
+`shell/gnome/` and `scripts/`.
+
 ## Pages
 
 | Page | What it shows | Where it comes from |
@@ -205,7 +225,7 @@ icon, with strokes bold enough to read at 16 pixels.
 ```
 cargo build --release
 cargo test --release          # formatting, stat parsing, unit names, scales
-./packaging/build.sh patrone-task-manager -d   # on the dev VM
+tools/build-deb.sh -d          # the package, into out/
 ```
 
 Testing without a desktop session: the throwaway GNOME Shell
@@ -269,3 +289,12 @@ own folder (`/tmp/patrone-tm-test`) and display (`wayland-patrone-tm`):
   about 4% of one core on Processes and 3% on Performance. Reading 500
   processes takes 12 to 24 ms a second; GTK's three renderers (Vulkan,
   GL, cairo) were within a few milliseconds of each other.
+
+## Releases
+
+A tag `vVERSION`, where VERSION is `debian/changelog`'s, makes a GitHub
+release (`.github/workflows/release.yml`): the `.deb`, built in a clean
+Ubuntu 26.04 container, the source tarball (`git archive` of the tag) and
+`SHA256SUMS`. PatroneOS builds its own package from that tarball: its
+repository pins the release in `packaging/patrone-task-manager/release.txt`, and moving
+the pin on its `main` publishes it to Patrone's apt repository.

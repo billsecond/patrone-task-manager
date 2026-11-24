@@ -2,7 +2,7 @@
 //! how hard the computer is working, each app's use since it started, what
 //! starts at sign-in, who is signed in, and the system's services. It works
 //! the way people who have used Windows expect, in Patrone's own words.
-//! Ctrl+Shift+Esc opens it (packaging/patrone-task-manager sets that up).
+//! Ctrl+Shift+Esc opens it on PatroneOS (its patrone-desktop sets that up).
 //!
 //!   patrone-task-manager [--page processes|performance|history|startup|users|details|services]
 
